@@ -666,14 +666,28 @@ cdef class Capture:
 
     cdef _stop(self):
         cdef int status = 0
-        status = uvc.uvc_stream_stop(self.strmh)
-        if status != uvc.UVC_SUCCESS:
-            #raise Exception("Can't stop  stream: Error:'%s'."%uvc_error_codes[status])
-            logger.error("Can't stop stream: Error:'%s'. Will ignore this and try to continue."%uvc_error_codes[status])
+        try:
+            device_ok = is_accessible(self._info['uid'])
+        except ValueError:
+            device_ok = False
+
+        if device_ok:
+            status = uvc.uvc_stream_stop(self.strmh)
+            if status != uvc.UVC_SUCCESS:
+                #raise Exception("Can't stop  stream: Error:'%s'."%uvc_error_codes[status])
+                logger.error("Can't stop stream: Error:'%s'. Will ignore this and try to continue."%uvc_error_codes[status])
+            else:
+                logger.debug("Stream stopped")
+            uvc.uvc_stream_close(self.strmh)
+            logger.debug("Stream closed")
         else:
-            logger.debug("Stream stopped")
-        uvc.uvc_stream_close(self.strmh)
-        logger.debug("Stream closed")
+            uvc.uvc_unref_device(self.dev)
+            self.dev = NULL
+            self.devh = NULL
+            self.ctx = NULL
+            turbojpeg.tjDestroy(self.tj_context)
+            self.tj_context = NULL
+
         self._stream_on = 0
         logger.debug("Stream stop.")
 
